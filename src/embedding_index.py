@@ -57,14 +57,12 @@
 
 import os
 from dotenv import load_dotenv
-from langchain_community.vectorstores import Chroma, FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
-from chromadb.config import Settings
 from langchain.schema import Document
 
 _vectorstore = None
-VECTOR_DB_PATH = "chroma_db"  # folder, not a single file
-FAISS_DB_PATH = "vector_db"   # fallback path if Chroma not usable
+FAISS_DB_PATH = "vector_db"   # local directory for FAISS index
 
 load_dotenv()
 
@@ -94,27 +92,21 @@ def build_or_load_index(chat_data_chunks, policy_docs):
         print("[DEBUG] Returning in-memory vectorstore")
         return _vectorstore
 
-    # Smaller model can reduce embedding dimensionality & disk usage
+    # Initialize embeddings
     embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
     api_key = _get_api_key()
     embeddings = OpenAIEmbeddings(openai_api_key=api_key, model=embedding_model)
     print(f"[DEBUG] Using embedding model: {embedding_model}")
 
-    prefer_faiss = os.getenv("USE_FAISS_FALLBACK", "0") == "1"
-    chroma_impl = os.getenv("CHROMA_DB_IMPL", "duckdb+parquet")  # avoid old sqlite on Streamlit
-    client_settings = Settings(chroma_db_impl=chroma_impl, persist_directory=VECTOR_DB_PATH)
-
     # Attempt Chroma load/create unless FAISS forced
-    if not prefer_faiss:
+    # Load FAISS if present
+    if os.path.exists(FAISS_DB_PATH) and os.listdir(FAISS_DB_PATH):
         try:
-            if os.path.exists(VECTOR_DB_PATH) and os.listdir(VECTOR_DB_PATH):
-                print(f"[DEBUG] Loading Chroma vectorstore from {VECTOR_DB_PATH} using impl={chroma_impl}")
-                _vectorstore = Chroma(persist_directory=VECTOR_DB_PATH, embedding_function=embeddings, client_settings=client_settings)
-                print("[DEBUG] Chroma vectorstore loaded from disk")
-                return _vectorstore
+            _vectorstore = FAISS.load_local(FAISS_DB_PATH, embeddings, allow_dangerous_deserialization=True)
+            print(f"[DEBUG] FAISS index loaded from {FAISS_DB_PATH}")
+            return _vectorstore
         except Exception as e:
-            print(f"[WARN] Chroma load failed ({e}); falling back to FAISS.")
-            prefer_faiss = True
+            print(f"[WARN] Failed to load existing FAISS index ({e}); rebuilding.")
 
     # Wrap chat_data_chunks if needed
     if isinstance(chat_data_chunks[0], Document):
@@ -127,21 +119,9 @@ def build_or_load_index(chat_data_chunks, policy_docs):
     all_docs = chat_docs + policy_docs
     print(f"[DEBUG] Total documents for indexing: {len(all_docs)}")
 
-    if not prefer_faiss:
-        try:
-            _vectorstore = Chroma.from_documents(all_docs, embeddings, persist_directory=VECTOR_DB_PATH, client_settings=client_settings)
-            print("[DEBUG] Chroma vectorstore created from documents")
-            _vectorstore.persist()
-            print(f"[DEBUG] Chroma vectorstore persisted to {VECTOR_DB_PATH}")
-            return _vectorstore
-        except Exception as e:
-            print(f"[WARN] Chroma creation failed ({e}); using FAISS fallback.")
-            prefer_faiss = True
-
-    # FAISS fallback (non-persistent unless you implement save/load manually)
+    # Build FAISS from documents
     _vectorstore = FAISS.from_documents(all_docs, embeddings)
-    print("[DEBUG] FAISS vectorstore created (fallback mode)")
-    # Optional: save FAISS index if desired
+    print("[DEBUG] FAISS vectorstore created from documents")
     try:
         os.makedirs(FAISS_DB_PATH, exist_ok=True)
         _vectorstore.save_local(FAISS_DB_PATH)

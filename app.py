@@ -8,9 +8,19 @@ from src.embedding_index import build_or_load_index
 # Load environment variables (e.g., OpenAI API key)
 load_dotenv()
 
-# Support Streamlit Cloud secrets
-if "OPENAI_API_KEY" in st.secrets and not os.getenv("OPENAI_API_KEY"):
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+# Safe Streamlit secrets access (avoid exception if no secrets file locally)
+if not os.getenv("OPENAI_API_KEY"):
+    try:
+        secret_key = None
+        # st.secrets may raise if no secrets config; guard with try
+        try:
+            secret_key = st.secrets.get("OPENAI_API_KEY")  # returns None if missing
+        except Exception:
+            secret_key = None
+        if secret_key:
+            os.environ["OPENAI_API_KEY"] = secret_key
+    except Exception:
+        pass
 
 api_key_present = bool(os.getenv("OPENAI_API_KEY"))
 if not api_key_present:
@@ -34,11 +44,23 @@ if "chat_history" not in st.session_state:
 
 # Input box for user to ask a question
 user_input = st.text_input("Ask a question about underwriting, coverage, or policy:")
+debug = st.sidebar.checkbox("Show debug traces", value=False)
 if user_input:
-    index = get_index()  # Ensure index built once
-    response = chat_with_agent(user_input)
-    st.session_state.chat_history.append(("🧑 Broker", user_input))  # Add user input to chat history
-    st.session_state.chat_history.append(("🤖 Agent", response))     # Add agent response to chat history
+    st.session_state.chat_history.append(("🧑 Broker", user_input))
+    with st.spinner("Thinking..."):
+        try:
+            _ = get_index()  # build / load once
+            response = chat_with_agent(user_input)
+        except Exception as e:
+            import traceback, textwrap
+            tb = traceback.format_exc()
+            msg = f"Error: {e}"
+            st.error(msg)
+            if debug:
+                st.code(tb, language="text")
+            response = msg
+        finally:
+            st.session_state.chat_history.append(("🤖 Agent", response))
 
 # Display the chat history
 with st.container():

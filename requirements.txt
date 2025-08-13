@@ -10,3 +10,4 @@ langchain-community
 tiktoken
 langchain-openai
 openpyxl
+faiss-cpu
