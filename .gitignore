@@ -23,3 +23,8 @@
 
 # # Misc
 # *.sqlite3
+
+# User-requested: ignore selected policy document category folders
+data/policy_documents/Shop/
+data/policy_documents/Small Fleet/
+data/policy_documents/Trades and professions/

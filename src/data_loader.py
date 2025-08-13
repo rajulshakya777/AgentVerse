@@ -1,17 +1,48 @@
 import os
+import os
+import hashlib
 import pandas as pd
 from langchain.document_loaders import PyMuPDFLoader, UnstructuredWordDocumentLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 import re
 
+# Size-reduction configuration (can be overridden via env vars)
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 1500))            # Larger chunks = fewer vectors
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 50))        # Smaller overlap reduces duplication
+MIN_CHUNK_CHARS = int(os.getenv("MIN_CHUNK_CHARS", 80))    # Drop trivial / boilerplate chunks
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+def _hash(text: str) -> str:
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
+def dedupe_documents(documents):
+    """Remove exact duplicate (normalized) page_content documents to cut index size."""
+    seen = set()
+    unique = []
+    for d in documents:
+        norm = _normalize(d.page_content)
+        h = _hash(norm)
+        if h in seen:
+            continue
+        seen.add(h)
+        unique.append(d)
+    return unique
+
 def chunk_text(text, source=""):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
         separators=["\n\n", "\n", ".", " "]
     )
-    return [Document(page_content=chunk, metadata={"source": source}) for chunk in splitter.split_text(text)]
+    chunks = []
+    for chunk in splitter.split_text(text):
+        if len(chunk) < MIN_CHUNK_CHARS:
+            continue  # skip very small fragments
+        chunks.append(Document(page_content=chunk, metadata={"source": source}))
+    return chunks
 
 def load_chat_data(chat_excel_path):
     df = pd.read_excel(chat_excel_path)
@@ -42,12 +73,20 @@ def load_chat_data(chat_excel_path):
             "outcome": row.get("OUTCOME", "")
         }
 
+        # Chunk and attach minimal metadata (avoid storing large redundant keys)
         chunks = chunk_text(chat_text, source="chat")
         for chunk in chunks:
-            chunk.metadata.update(metadata)
+            # Only keep small essential metadata keys
+            for k, v in metadata.items():
+                if v:  # don't store empty strings
+                    chunk.metadata[k] = v
             all_docs.append(chunk)
 
-    print(f"[DEBUG] Returning {len(all_docs)} chat Document objects from file: {chat_excel_path}")
+    # Deduplicate after chunking to remove overlapping / repeated content
+    before = len(all_docs)
+    all_docs = dedupe_documents(all_docs)
+    after = len(all_docs)
+    print(f"[DEBUG] Returning {after} (was {before}) deduped chat Document objects from file: {chat_excel_path}")
     return all_docs
 
 def load_policy_docs(policy_folder):
@@ -67,7 +106,11 @@ def load_policy_docs(policy_folder):
                 continue
             docs = loader.load()
             text = "\n".join([doc.page_content for doc in docs])
+            # Basic boilerplate filter (drop very short whole-doc extracts)
             chunks = chunk_text(text, source=file)
             documents.extend(chunks)
-    print(f"[DEBUG] Returning {len(documents)} policy Document objects from folder: {policy_folder}")
+    before = len(documents)
+    documents = dedupe_documents(documents)
+    after = len(documents)
+    print(f"[DEBUG] Returning {after} (was {before}) policy Document objects from folder: {policy_folder}")
     return documents

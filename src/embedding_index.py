@@ -60,6 +60,7 @@ from dotenv import load_dotenv
 from langchain.vectorstores import Chroma
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.schema import Document
+import numpy as np
 
 _vectorstore = None
 VECTOR_DB_PATH = "chroma_db"  # folder, not a single file
@@ -75,7 +76,10 @@ def build_or_load_index(chat_data_chunks, policy_docs):
         print("[DEBUG] Returning in-memory vectorstore")
         return _vectorstore
 
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    # Smaller model can reduce embedding dimensionality & disk usage
+    embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY, model=embedding_model)
+    print(f"[DEBUG] Using embedding model: {embedding_model}")
 
     # If Chroma index exists on disk, load it
     if os.path.exists(VECTOR_DB_PATH) and os.listdir(VECTOR_DB_PATH):
