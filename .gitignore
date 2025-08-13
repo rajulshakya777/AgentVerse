@@ -4,8 +4,8 @@
 # *.pyo
 # *.pyd
 
-# # Virtual env
-# venv/
+# Virtual env
+venv/
 # .env
 
 # # macOS
