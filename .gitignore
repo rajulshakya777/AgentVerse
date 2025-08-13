@@ -1,25 +1,25 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
+# # Python
+# __pycache__/
+# *.py[cod]
+# *.pyo
+# *.pyd
 
-# Virtual env
-venv/
-.env
+# # Virtual env
+# venv/
+# .env
 
-# macOS
-.DS_Store
+# # macOS
+# .DS_Store
 
-# Local vector / embedding indexes & databases (regenerated)
-chroma_db/
-vector_db/
+# # Local vector / embedding indexes & databases (regenerated)
+# chroma_db/
+# vector_db/
 
-# Jupyter
-.ipynb_checkpoints/
+# # Jupyter
+# .ipynb_checkpoints/
 
-# Logs
-logs/
+# # Logs
+# logs/
 
-# Misc
-*.sqlite3
+# # Misc
+# *.sqlite3
