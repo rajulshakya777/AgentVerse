@@ -1,8 +1,16 @@
+import os
+import time
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from src.data_loader import load_chat_data, load_policy_docs
 from src.embedding_index import build_or_load_index
+
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+EMBED_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+
+_last_call_ts = 0.0
+_min_call_interval = float(os.getenv("MIN_LLM_INTERVAL", 1.0))  # seconds
 
 # Prompt template for LLM decision inference
 DECISION_PROMPT_TEMPLATE = """
@@ -26,6 +34,11 @@ Explanation:
 """
 
 def chat_with_agent(query):
+    global _last_call_ts
+    now = time.time()
+    if now - _last_call_ts < _min_call_interval:
+        time.sleep(_min_call_interval - (now - _last_call_ts))
+    _last_call_ts = time.time()
     # Load chat history data from Excel file
     chat_data = load_chat_data("data/chat_data/chat_data.xlsx")
     print(f"[DEBUG] Loaded {len(chat_data)} chat documents")  # Debug: Number of chat docs loaded
@@ -39,7 +52,7 @@ def chat_with_agent(query):
     print("[DEBUG] Index built or loaded successfully")  # Debug: Index status
 
     # Initialize the OpenAI chat model with deterministic output (temperature=0)
-    llm = ChatOpenAI(temperature=0)
+    llm = ChatOpenAI(temperature=0, model_name=MODEL_NAME)
     print("[DEBUG] ChatOpenAI model initialized")  # Debug: LLM status
 
     # Create a retriever from the index for semantic search
@@ -59,7 +72,10 @@ def chat_with_agent(query):
     print(f"[DEBUG] Prompt for LLM (first 500 chars):\n{prompt[:500]}")  # Debug: Prompt preview
 
     # Query the LLM with the full prompt and get the response
-    response = llm.call_as_llm(prompt)
+    try:
+        response = llm.call_as_llm(prompt)
+    except Exception as e:
+        response = f"Error contacting LLM: {e}"
     print(f"[DEBUG] LLM response:\n{response}")  # Debug: LLM output
 
     # Return the model's response (should include Answer, Decision, Explanation)
