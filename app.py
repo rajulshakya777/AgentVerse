@@ -7,6 +7,11 @@ from src.embedding_index import build_or_load_index
 
 # Load environment variables (e.g., OpenAI API key)
 load_dotenv()
+
+# Support Streamlit Cloud secrets
+if "OPENAI_API_KEY" in st.secrets and not os.getenv("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
 api_key_present = bool(os.getenv("OPENAI_API_KEY"))
 if not api_key_present:
     st.warning("OPENAI_API_KEY not set. Add it as a Streamlit secret or environment variable.")
