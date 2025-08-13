@@ -11,9 +11,9 @@
 # # macOS
 # .DS_Store
 
-# # Local vector / embedding indexes & databases (regenerated)
-# chroma_db/
-# vector_db/
+# Local vector / embedding indexes & databases (regenerated)
+chroma_db/
+vector_db/
 
 # # Jupyter
 # .ipynb_checkpoints/
