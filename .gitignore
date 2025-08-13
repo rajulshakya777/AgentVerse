@@ -6,7 +6,7 @@
 
 # Virtual env
 venv/
-# .env
+.env
 
 # # macOS
 # .DS_Store
