@@ -1,6 +1,6 @@
 openai
 langchain
-faiss-cpu
+chromadb
 pymupdf
 unstructured
 python-docx
