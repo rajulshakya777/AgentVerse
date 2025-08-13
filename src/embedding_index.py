@@ -57,16 +57,23 @@
 
 import os
 from dotenv import load_dotenv
-from langchain.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document
-import numpy as np
 
 _vectorstore = None
 VECTOR_DB_PATH = "chroma_db"  # folder, not a single file
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+def _get_api_key():
+    # Re-read each time so late injection (e.g. Streamlit secrets) works
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError(
+            "OPENAI_API_KEY not set. Provide via environment variable or Streamlit secrets."
+        )
+    return key
 
 def build_or_load_index(chat_data_chunks, policy_docs):
     global _vectorstore
@@ -78,7 +85,8 @@ def build_or_load_index(chat_data_chunks, policy_docs):
 
     # Smaller model can reduce embedding dimensionality & disk usage
     embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY, model=embedding_model)
+    api_key = _get_api_key()
+    embeddings = OpenAIEmbeddings(openai_api_key=api_key, model=embedding_model)
     print(f"[DEBUG] Using embedding model: {embedding_model}")
 
     # If Chroma index exists on disk, load it
