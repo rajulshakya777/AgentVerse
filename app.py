@@ -26,8 +26,26 @@ api_key_present = bool(os.getenv("OPENAI_API_KEY"))
 if not api_key_present:
     st.warning("OPENAI_API_KEY not set. Add it as a Streamlit secret or environment variable.")
 
-# Set Streamlit app title
-st.set_page_config(page_title="Agenverse - Underwriting AI", page_icon="🛡️", layout="wide")
+# Set Streamlit app title with enhanced meta information
+st.set_page_config(
+    page_title="Agenverse - Underwriting AI", 
+    page_icon="🛡️", 
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'About': "Agenverse is an AI-powered underwriting assistant that helps insurance professionals with policy analysis and coverage questions."
+    }
+)
+
+# Add Open Graph meta tags for better social media sharing
+st.markdown("""
+<meta property="og:title" content="Agenverse - AI Underwriting Assistant">
+<meta property="og:description" content="AI-powered underwriting assistant for insurance professionals. Get instant policy analysis and coverage insights.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://agenverse.streamlit.app">
+<meta name="description" content="Agenverse is an AI-powered underwriting assistant that helps insurance professionals with policy analysis and coverage questions.">
+<meta name="keywords" content="AI, underwriting, insurance, policy analysis, artificial intelligence">
+""", unsafe_allow_html=True)
 
 # Beautiful header with custom styling
 st.markdown("""
